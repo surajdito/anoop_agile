@@ -1,125 +1,88 @@
-import os
-import copy
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torchvision import datasets, transforms, models
-from torch.utils.data import DataLoader
-from sklearn.metrics import accuracy_score
+from sklearn.datasets import make_classification
+from sklearn.model_selection import train_test_split
+from tqdm import tqdm
+import numpy as np
 
-DATA_DIR = "./data"  
-BATCH_SIZE = 32
-LR = 0.0001
-EPOCHS = 10
-PATIENCE = 3
+# ===============================
+# Ask user how many samples
+# ===============================
+num_samples = int(input("Enter number of samples to generate: "))
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-print("Using device:", device)
+print(f"\nGenerating {num_samples} synthetic data samples...\n")
 
-train_transforms = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.RandomHorizontalFlip(),
-    transforms.RandomRotation(15),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406],
-                         [0.229, 0.224, 0.225])
-])
+# ===============================
+# Generate Synthetic Dataset
+# ===============================
+X, y = make_classification(
+    n_samples=num_samples,
+    n_features=20,
+    n_classes=2,
+    n_informative=15,
+    random_state=42
+)
 
-val_transforms = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406],
-                         [0.229, 0.224, 0.225])
-])
+X = torch.tensor(X, dtype=torch.float32)
+y = torch.tensor(y, dtype=torch.long)
 
-train_dataset = datasets.ImageFolder(os.path.join(DATA_DIR, "train"), transform=train_transforms)
-val_dataset = datasets.ImageFolder(os.path.join(DATA_DIR, "val"), transform=val_transforms)
+X_train, X_val, y_train, y_val = train_test_split(
+    X, y, test_size=0.2, random_state=42
+)
 
-train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-val_loader = DataLoader(val_dataset, batch_size=BATCH_SIZE, shuffle=False)
+# ===============================
+# Define Neural Network
+# ===============================
+class SimpleNN(nn.Module):
+    def __init__(self, input_size):
+        super(SimpleNN, self).__init__()
+        self.model = nn.Sequential(
+            nn.Linear(input_size, 64),
+            nn.ReLU(),
+            nn.BatchNorm1d(64),
+            nn.Linear(64, 32),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(32, 2)
+        )
 
-model = models.resnet18(pretrained=True)
+    def forward(self, x):
+        return self.model(x)
 
-for param in model.parameters():
-    param.requires_grad = False
+model = SimpleNN(input_size=20)
 
-num_features = model.fc.in_features
-model.fc = nn.Linear(num_features, 2)  
-model = model.to(device)
-
+# ===============================
+# Training Setup
+# ===============================
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.fc.parameters(), lr=LR)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+EPOCHS = 20
 
-
-def train_one_epoch():
-    model.train()
-    total_loss = 0
-    all_preds = []
-    all_labels = []
-
-    for images, labels in train_loader:
-        images, labels = images.to(device), labels.to(device)
-
-        optimizer.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimizer.step()
-
-        total_loss += loss.item()
-        preds = torch.argmax(outputs, dim=1)
-
-        all_preds.extend(preds.cpu().numpy())
-        all_labels.extend(labels.cpu().numpy())
-
-    acc = accuracy_score(all_labels, all_preds)
-    return total_loss / len(train_loader), acc
-
-
-def validate():
-    model.eval()
-    total_loss = 0
-    all_preds = []
-    all_labels = []
-
-    with torch.no_grad():
-        for images, labels in val_loader:
-            images, labels = images.to(device), labels.to(device)
-
-            outputs = model(images)
-            loss = criterion(outputs, labels)
-
-            total_loss += loss.item()
-            preds = torch.argmax(outputs, dim=1)
-
-            all_preds.extend(preds.cpu().numpy())
-            all_labels.extend(labels.cpu().numpy())
-
-    acc = accuracy_score(all_labels, all_preds)
-    return total_loss / len(val_loader), acc
-
-best_loss = float("inf")
-patience_counter = 0
-best_model_wts = copy.deepcopy(model.state_dict())
+# ===============================
+# Training Loop with Progress Bar
+# ===============================
+print("Training model...\n")
 
 for epoch in range(EPOCHS):
-    train_loss, train_acc = train_one_epoch()
-    val_loss, val_acc = validate()
+    model.train()
+    
+    outputs = model(X_train)
+    loss = criterion(outputs, y_train)
 
-    print(f"\nEpoch {epoch+1}/{EPOCHS}")
-    print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
-    print(f"Val   Loss: {val_loss:.4f} | Val   Acc: {val_acc:.4f}")
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
 
-    if val_loss < best_loss:
-        best_loss = val_loss
-        best_model_wts = copy.deepcopy(model.state_dict())
-        torch.save(best_model_wts, "best_model.pth")
-        patience_counter = 0
-    else:
-        patience_counter += 1
+    # Validation
+    model.eval()
+    with torch.no_grad():
+        val_outputs = model(X_val)
+        _, predicted = torch.max(val_outputs, 1)
+        accuracy = (predicted == y_val).float().mean()
 
-    if patience_counter >= PATIENCE:
-        print("Early stopping triggered.")
-        break
+    print(f"Epoch [{epoch+1}/{EPOCHS}] "
+          f"Loss: {loss.item():.4f} "
+          f"Val Accuracy: {accuracy.item():.4f}")
 
-print("Training complete.")
+print("\nTraining complete 🚀")
