@@ -6,16 +6,10 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import numpy as np
 
-# ===============================
-# Ask user how many samples
-# ===============================
 num_samples = int(input("Enter number of samples to generate: "))
 
 print(f"\nGenerating {num_samples} synthetic data samples...\n")
 
-# ===============================
-# Generate Synthetic Dataset
-# ===============================
 X, y = make_classification(
     n_samples=num_samples,
     n_features=20,
@@ -31,9 +25,6 @@ X_train, X_val, y_train, y_val = train_test_split(
     X, y, test_size=0.2, random_state=42
 )
 
-# ===============================
-# Define Neural Network
-# ===============================
 class SimpleNN(nn.Module):
     def __init__(self, input_size):
         super(SimpleNN, self).__init__()
@@ -52,16 +43,10 @@ class SimpleNN(nn.Module):
 
 model = SimpleNN(input_size=20)
 
-# ===============================
-# Training Setup
-# ===============================
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
-EPOCHS = 20
+EPOCHS = 100
 
-# ===============================
-# Training Loop with Progress Bar
-# ===============================
 print("Training model...\n")
 
 for epoch in range(EPOCHS):
@@ -74,7 +59,6 @@ for epoch in range(EPOCHS):
     loss.backward()
     optimizer.step()
 
-    # Validation
     model.eval()
     with torch.no_grad():
         val_outputs = model(X_val)
@@ -85,4 +69,4 @@ for epoch in range(EPOCHS):
           f"Loss: {loss.item():.4f} "
           f"Val Accuracy: {accuracy.item():.4f}")
 
-print("\nTraining complete 🚀")
+print("\nTraining complete")
