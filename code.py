@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 from tqdm import tqdm
 import numpy as np
 
-num_samples = int(input("Enter number of samples to generate: "))
+num_samples = 1000
 
 print(f"\nGenerating {num_samples} synthetic data samples...\n")
 
