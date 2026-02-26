@@ -1,35 +1,40 @@
+import unittest
 
-from flask import Flask, render_template, request
-from sklearn import model_selection, linear_model
-import numpy as np
+class Calculator:
+    def add(self, x, y):
+        return x + y
 
-app = Flask(__name__)
+    def subtract(self, x, y):
+        return x - y
 
-# --- Your ML Program Logic ---
-X = [[4.0], [5.0], [6.0], [7.0], [8.0], [9.0], [10.0]]
-y = [8, 10, 12, 14, 16, 18, 20]
+    def multiply(self, x, y):
+        return x * y
 
-# Train the model
-X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.3, random_state=7)
-reg = linear_model.LinearRegression()
-reg.fit(X_train, y_train)
-accuracy = reg.score(X_test, y_test) * 100
+    def divide(self, x, y):
+        if y == 0:
+            raise ValueError("Division by zero is not allowed")
+        return x / y
 
-@app.route('/')
-def index():
-    return render_template('index.html', accuracy=round(accuracy, 2))
+class CalculatorTest(unittest.TestCase):
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    if request.method == 'POST':
-        # Get input from the form
-        user_input = float(request.form['val'])
-        # Predict using the model
-        prediction = reg.predict([[user_input]])
-        return render_template('index.html', 
-                               accuracy=round(accuracy, 2), 
-                               prediction=round(prediction[0], 2),
-                               last_val=user_input)
+    def setUp(self):
+        self.calc = Calculator()
+
+    def test_add(self):
+        self.assertEqual(10, self.calc.add(3, 7), "The addition is wrong")
+
+    def test_subtract(self):
+        self.assertEqual(12, self.calc.subtract(15, 3), "Subtraction is wrong")
+
+    def test_multiply(self):
+        self.assertEqual(30, self.calc.multiply(5, 6), "Multiplication is wrong")
+
+    def test_divide(self):
+        self.assertEqual(3, self.calc.divide(6, 2), "Division is wrong")
+
+    def test_divide_by_zero(self):
+        with self.assertRaises(ValueError):
+            self.calc.divide(5, 0)
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    unittest.main(argv=['first-arg-is-ignored'], exit=False)
