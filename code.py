@@ -1,72 +1,35 @@
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from sklearn.datasets import make_classification
-from sklearn.model_selection import train_test_split
-from tqdm import tqdm
+
+from flask import Flask, render_template, request
+from sklearn import model_selection, linear_model
 import numpy as np
 
-num_samples = 1000
+app = Flask(__name__)
 
-print(f"\nGenerating {num_samples} synthetic data samples...\n")
+# --- Your ML Program Logic ---
+X = [[4.0], [5.0], [6.0], [7.0], [8.0], [9.0], [10.0]]
+y = [8, 10, 12, 14, 16, 18, 20]
 
-X, y = make_classification(
-    n_samples=num_samples,
-    n_features=20,
-    n_classes=2,
-    n_informative=15,
-    random_state=42
-)
+# Train the model
+X_train, X_test, y_train, y_test = model_selection.train_test_split(X, y, test_size=0.3, random_state=7)
+reg = linear_model.LinearRegression()
+reg.fit(X_train, y_train)
+accuracy = reg.score(X_test, y_test) * 100
 
-X = torch.tensor(X, dtype=torch.float32)
-y = torch.tensor(y, dtype=torch.long)
+@app.route('/')
+def index():
+    return render_template('index.html', accuracy=round(accuracy, 2))
 
-X_train, X_val, y_train, y_val = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
+@app.route('/predict', methods=['POST'])
+def predict():
+    if request.method == 'POST':
+        # Get input from the form
+        user_input = float(request.form['val'])
+        # Predict using the model
+        prediction = reg.predict([[user_input]])
+        return render_template('index.html', 
+                               accuracy=round(accuracy, 2), 
+                               prediction=round(prediction[0], 2),
+                               last_val=user_input)
 
-class SimpleNN(nn.Module):
-    def __init__(self, input_size):
-        super(SimpleNN, self).__init__()
-        self.model = nn.Sequential(
-            nn.Linear(input_size, 64),
-            nn.ReLU(),
-            nn.BatchNorm1d(64),
-            nn.Linear(64, 32),
-            nn.ReLU(),
-            nn.Dropout(0.3),
-            nn.Linear(32, 2)
-        )
-
-    def forward(self, x):
-        return self.model(x)
-
-model = SimpleNN(input_size=20)
-
-criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.001)
-EPOCHS = 150
-
-print("Training model...\n")
-
-for epoch in range(EPOCHS):
-    model.train()
-    
-    outputs = model(X_train)
-    loss = criterion(outputs, y_train)
-
-    optimizer.zero_grad()
-    loss.backward()
-    optimizer.step()
-
-    model.eval()
-    with torch.no_grad():
-        val_outputs = model(X_val)
-        _, predicted = torch.max(val_outputs, 1)
-        accuracy = (predicted == y_val).float().mean()
-
-    print(f"Epoch [{epoch+1}/{EPOCHS}] "
-          f"Loss: {loss.item():.4f} "
-          f"Val Accuracy: {accuracy.item():.4f}")
-
-print("\nTraining complete")
+if __name__ == '__main__':
+    app.run(debug=True)
